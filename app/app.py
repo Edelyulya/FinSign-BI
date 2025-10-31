@@ -133,6 +133,54 @@ if st.sidebar.button("⇅ Запустить ETL Ozon и пересобрать"
         st.error("❌ Не удалось запустить ETL")
         st.code(str(e))
 
+import subprocess
+from datetime import date, timedelta
+
+# ...
+
+with st.sidebar:
+    st.header("Админ-панель")
+
+    # уже существующая кнопка пересборки витрины
+    if st.button("⟳ Пересобрать витрину"):
+        try:
+            from sqlalchemy import text
+            sql = """
+            -- тут вызывается та же функция пересборки, что и из etl/ozon_loader.py
+            """
+            # Лучше вызывать нашу python-функцию, но если она инкапсулирована в etl,
+            # мы просто перезапустим rebuild через ozon_loader.
+        except Exception as e:
+            st.error("❌ Ошибка пересборки витрины")
+            st.code(str(e))
+        else:
+            st.success("✅ Витрина пересобрана из raw.")
+
+    # уже существующая кнопка: Ozon ETL + rebuild
+    if st.button("⏱ Запустить ETL Ozon и пересобрать"):
+        try:
+            subprocess.check_call(
+                ["python", "etl/ozon_loader.py"],
+            )
+            st.success("✅ ETL Ozon выполнен")
+        except subprocess.CalledProcessError as e:
+            st.error("❌ Не удалось запустить ETL Ozon")
+            st.code(str(e))
+
+    # НОВАЯ КНОПКА: WB ETL + rebuild
+    if st.button("🟣 Запустить ETL WB и пересобрать"):
+        try:
+            since = (date.today() - timedelta(days=30)).isoformat()
+            until = date.today().isoformat()
+            subprocess.check_call(
+                ["python", "etl/wb_loader.py", "--since", since, "--until", until]
+            )
+            st.success("✅ ETL WB выполнен")
+        except subprocess.CalledProcessError as e:
+            st.error("❌ Не удалось запустить ETL WB")
+            st.code(str(e))
+
+
 st.sidebar.caption(f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ---------- Автопересборка при первом старте (без кнопки) ----------

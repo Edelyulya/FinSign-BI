@@ -20,4 +20,5 @@ __pycache__/
 # Игнорируем файлы конфигурации
 config.json
 /папка_с_конфигами/Users/yuliyasalodkina/FinSign-BI
-*.log
+*.logconfig.json
+*.env

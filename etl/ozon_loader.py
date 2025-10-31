@@ -253,18 +253,39 @@ GROUP BY 1,2;
 def rebuild_mart_from_raw(engine):
     """Полная пересборка mart.fact_sales напрямую из raw.ozon_stock (без TEMP-таблиц)."""
     sql = """
-    TRUNCATE TABLE mart.fact_sales;
+-- стейджинг из OZON
+DROP TABLE IF EXISTS mart._stg_fact_ozon;
+CREATE TABLE IF NOT EXISTS mart._stg_fact_ozon AS
+SELECT
+    COALESCE(date, CURRENT_DATE)::date          AS date,
+    'ozon'::text                                AS marketplace,
+    COALESCE(sku, 'UNKNOWN')::text              AS sku,
+    NULLIF(region, '')::text                    AS region,
+    COALESCE(quantity, 0)::numeric
+      * COALESCE(price,    0)::numeric         AS revenue,
+    0::numeric(18,2)                            AS cost
+FROM raw.ozon_stock;
 
-    INSERT INTO mart.fact_sales (date, marketplace, sku, region, revenue, cost)
-    SELECT
-        COALESCE(date, CURRENT_DATE)::date                AS date,
-        'ozon'::text                                      AS marketplace,
-        COALESCE(sku, 'UNKNOWN')::text                    AS sku,
-        COALESCE(NULLIF(region, ''), '')::text            AS region,
-        (COALESCE(quantity, 0)::numeric
-         * COALESCE(price,    0)::numeric)               AS revenue,
-        0::numeric(18,2)                                  AS cost
-    FROM raw.ozon_stock;
+-- стейджинг из WB
+DROP TABLE IF EXISTS mart._stg_fact_wb;
+CREATE TABLE IF NOT EXISTS mart._stg_fact_wb AS
+SELECT
+    COALESCE(date, CURRENT_DATE)::date          AS date,
+    'wb'::text                                  AS marketplace,
+    COALESCE(sku, 'UNKNOWN')::text              AS sku,
+    NULLIF(region, '')::text                    AS region,
+    COALESCE(quantity, 0)::numeric
+      * COALESCE(price,    0)::numeric         AS revenue,
+    0::numeric(18,2)                            AS cost
+FROM raw.wb_sales;
+
+-- полная пересборка витрины
+TRUNCATE TABLE mart.fact_sales;
+
+INSERT INTO mart.fact_sales (date, marketplace, sku, region, revenue, cost)
+SELECT date, marketplace, sku, COALESCE(region,'') AS region, revenue, cost FROM mart._stg_fact_ozon
+UNION ALL
+SELECT date, marketplace, sku, COALESCE(region,'') AS region, revenue, cost FROM mart._stg_fact_wb;
     """
     with engine.begin() as conn:
         conn.execute(text(sql))
